@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import { version } from '../../package.json';
 import { useToast } from './ToastContext';
 
@@ -21,43 +22,28 @@ export const DataProvider = ({ children }) => {
         }
     };
 
-    // Initial State
-    // Initial State
-    const [students, setStudents] = useState(() => {
-        const val = getLocalStorage('students', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [courses, setCourses] = useState(() => {
-        const val = getLocalStorage('courses', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [payments, setPayments] = useState(() => {
-        const val = getLocalStorage('payments', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [attendance, setAttendance] = useState(() => {
-        const val = getLocalStorage('attendance', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [enrollments, setEnrollments] = useState(() => {
-        const val = getLocalStorage('enrollments', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [notes, setNotes] = useState(() => {
-        const val = getLocalStorage('notes', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [files, setFiles] = useState(() => {
-        const val = getLocalStorage('files', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [advances, setAdvances] = useState(() => {
-        const val = getLocalStorage('advances', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [teacherGoals, setTeacherGoals] = useState(() => getLocalStorage('teacherGoals', { target: 0 }));
-    const [monthlyFinancialTarget, setMonthlyFinancialTarget] = useState(() => getLocalStorage('monthlyFinancialTarget', 0));
-    const [appRules, setAppRules] = useState(() => getLocalStorage('appRules', {
+    // --- API & Auth Integration ---
+    const { user, isLoaded: isUserLoaded } = useUser();
+    const { getToken } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // Initial State (Empty)
+    const [students, setStudents] = useState([]);
+    const [courses, setCourses] = useState([]);
+    const [payments, setPayments] = useState([]);
+    const [attendance, setAttendance] = useState([]);
+    const [enrollments, setEnrollments] = useState([]);
+    const [notes, setNotes] = useState([]);
+    const [files, setFiles] = useState([]);
+    const [advances, setAdvances] = useState([]);
+    const [complianceRecords, setComplianceRecords] = useState([]);
+    const [grades, setGrades] = useState([]);
+
+    // Settings defaults (can be moved to DB later)
+    const [teacherGoals, setTeacherGoals] = useState({ target: 0 });
+    const [monthlyFinancialTarget, setMonthlyFinancialTarget] = useState(0);
+    const [appRules, setAppRules] = useState({
         teacherShare: 50,
         courseDuration: 3,
         defaultCourseFee: 100,
@@ -66,16 +52,8 @@ export const DataProvider = ({ children }) => {
         attendanceThreshold: 70,
         completionThreshold: 90,
         defaultMaxPoints: 100
-    }));
-    const [complianceRecords, setComplianceRecords] = useState(() => {
-        const val = getLocalStorage('complianceRecords', []);
-        return Array.isArray(val) ? val : [];
     });
-    const [grades, setGrades] = useState(() => {
-        const val = getLocalStorage('grades', []);
-        return Array.isArray(val) ? val : [];
-    });
-    const [notificationPreferences, setNotificationPreferences] = useState(() => getLocalStorage('notificationPreferences', {
+    const [notificationPreferences, setNotificationPreferences] = useState({
         paymentDue: true,
         attendanceRisk: true,
         financialRisk: true,
@@ -83,72 +61,45 @@ export const DataProvider = ({ children }) => {
         advanceRepaid: true,
         studentProgressAlerts: true,
         courseCompletionAlerts: true,
-        complianceStrikeLimit: 3
-    }));
-    const [paymentFollowUpLedger, setPaymentFollowUpLedger] = useState(() => {
-        const val = getLocalStorage('paymentFollowUpLedger', []);
-        return Array.isArray(val) ? val : [];
+        complianceStrikeLimit: 3,
+        paymentFollowUpLedger: [] // Legacy structure
     });
+    const [paymentFollowUpLedger, setPaymentFollowUpLedger] = useState([]);
 
-    // Persistence
-    useEffect(() => localStorage.setItem('students', JSON.stringify(students)), [students]);
-    useEffect(() => localStorage.setItem('courses', JSON.stringify(courses)), [courses]);
-    useEffect(() => localStorage.setItem('payments', JSON.stringify(payments)), [payments]);
-    useEffect(() => localStorage.setItem('attendance', JSON.stringify(attendance)), [attendance]);
-    useEffect(() => localStorage.setItem('enrollments', JSON.stringify(enrollments)), [enrollments]);
-    useEffect(() => localStorage.setItem('notes', JSON.stringify(notes)), [notes]);
-    useEffect(() => localStorage.setItem('files', JSON.stringify(files)), [files]);
-    useEffect(() => localStorage.setItem('advances', JSON.stringify(advances)), [advances]);
-    useEffect(() => localStorage.setItem('complianceRecords', JSON.stringify(complianceRecords)), [complianceRecords]);
-    useEffect(() => localStorage.setItem('grades', JSON.stringify(grades)), [grades]);
-    useEffect(() => localStorage.setItem('monthlyFinancialTarget', JSON.stringify(monthlyFinancialTarget)), [monthlyFinancialTarget]);
-    useEffect(() => localStorage.setItem('teacherGoals', JSON.stringify(teacherGoals)), [teacherGoals]);
-    useEffect(() => localStorage.setItem('appRules', JSON.stringify(appRules)), [appRules]);
-    useEffect(() => localStorage.setItem('notificationPreferences', JSON.stringify(notificationPreferences)), [notificationPreferences]);
-    useEffect(() => localStorage.setItem('paymentFollowUpLedger', JSON.stringify(paymentFollowUpLedger)), [paymentFollowUpLedger]);
 
-    // Clean Data State Initialization
+    // Load Data from API
     useEffect(() => {
-        const isInitialized = localStorage.getItem('app_initialized');
-        if (!isInitialized) {
-            console.log('First run detected. Initializing clean data state...');
+        const loadData = async () => {
+            if (!isUserLoaded || !user) return;
 
-            // Clear any potential partial data
-            localStorage.clear();
+            setLoading(true);
+            try {
+                const api = (await import('../api/client')).createApiClient(getToken);
 
-            // Set default admin account
-            const defaultAccount = {
-                username: 'admin',
-                password: 'password',
-                name: 'Admin User',
-                role: 'Administrator',
-                email: 'admin@educore.com'
-            };
-            localStorage.setItem('account', JSON.stringify(defaultAccount));
+                // Parallel fetching of core data
+                const [studentsData, coursesData, dashboardStats] = await Promise.all([
+                    api.getStudents(),
+                    api.getCourses(),
+                    api.getDashboardStats()
+                ]);
 
-            // Mark as initialized
-            localStorage.setItem('app_initialized', 'true');
+                setStudents(studentsData);
+                setCourses(coursesData);
+                // Note: Other collections (payments, etc) need endpoints or can be loaded on demand. 
+                // For this phase, we ensure Students/Courses/Stats work as proof of concept.
 
-            // Force reload to pick up clean state if needed, though state should be empty by default
-            // In this context, state is already initialized from LS (which was empty or partial).
-            // Since we just cleared LS, we should update state to match if it wasn't empty.
-            // But since this runs on mount, state is already set. 
-            // If state had data but LS didn't have 'app_initialized', we might be in a weird spot.
-            // However, for a fresh install, state is empty.
-            // Let's explicitly set state to defaults to be safe.
-            setStudents([]);
-            setCourses([]);
-            setPayments([]);
-            setAttendance([]);
-            setEnrollments([]);
-            setNotes([]);
-            setFiles([]);
-            setAdvances([]);
-            setComplianceRecords([]);
-            setGrades([]);
-            setAccount(defaultAccount);
-        }
-    }, []);
+            } catch (err) {
+                console.error("Failed to load data:", err);
+                setError(err.message);
+                addToast("Failed to sync data with cloud.", "error");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [isUserLoaded, user, getToken]); // Re-run on auth change
+
 
     const calculateEarnings = () => {
         let total = 0;
@@ -190,16 +141,23 @@ export const DataProvider = ({ children }) => {
     // --- Actions ---
 
     // Student Actions
-    const addStudent = (student) => {
+    const addStudent = async (student) => {
         // Validation: Check for duplicate name (case-insensitive)
         const duplicate = students.find(s => s.name.toLowerCase() === student.name.toLowerCase());
         if (duplicate) {
             addToast('A student with this name already exists.', 'error');
             return;
         }
-        const newStudent = { ...student, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
-        setStudents([...students, newStudent]);
-        addToast('Student added successfully!', 'success');
+
+        try {
+            const api = (await import('../api/client')).createApiClient(getToken);
+            const newStudent = await api.createStudent(student);
+            setStudents(prev => [newStudent, ...prev]);
+            addToast('Student created in cloud!', 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Failed to create student.', 'error');
+        }
     };
 
     const updateStudent = (id, updates) => {
@@ -260,10 +218,16 @@ export const DataProvider = ({ children }) => {
 
 
     // Course Actions
-    const addCourse = (course) => {
-        const newCourse = { ...course, id: crypto.randomUUID(), status: 'Active', createdAt: new Date().toISOString() };
-        setCourses([...courses, newCourse]);
-        addToast('Course created successfully!', 'success');
+    const addCourse = async (course) => {
+        try {
+            const api = (await import('../api/client')).createApiClient(getToken);
+            const newCourse = await api.createCourse(course);
+            setCourses(prev => [...prev, newCourse]);
+            addToast('Course created successfully!', 'success');
+        } catch (error) {
+            console.error(error);
+            addToast('Failed to create course', 'error');
+        }
     };
 
     const updateCourse = (id, updates) => {
@@ -817,190 +781,11 @@ export const DataProvider = ({ children }) => {
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');
     };
 
-    // --- User Authentication & Security ---
-    const [user, setUser] = useState(() => {
-        const stored = getLocalStorage('user', null);
-        // Ensure user has a password field if it's an old record
-        if (stored && !stored.password) {
-            return { ...stored, password: 'password' };
-        }
-        return stored;
-    });
+    // --- Legacy Auth Removed (Clerk Handles This) ---
+    // account, login, logout, etc. removed. 
+    // We export dummy values if needed to prevent crashes during migration, 
+    // but ideally components should use useUser() directly.
 
-    const [securitySettings, setSecuritySettings] = useState(() => getLocalStorage('securitySettings', {
-        enableAutoLogout: false,
-        timeoutMinutes: 15
-    }));
-
-    useEffect(() => localStorage.setItem('securitySettings', JSON.stringify(securitySettings)), [securitySettings]);
-
-    const updateSecuritySettings = (key, value) => {
-        setSecuritySettings(prev => ({ ...prev, [key]: value }));
-    };
-
-    const login = (username, password, navigate) => {
-        const MASTER_KEY = "supersecret123";
-
-        // 1. Master Reset Key Check
-        if (username === 'admin' && password === MASTER_KEY) {
-            const userData = user || { name: 'Admin User', role: 'Administrator', email: 'admin@educore.com', password: 'password' };
-            // If using master key, we can optionally reset the password or just log them in.
-            // For now, we just log them in. The user can then change their password in Settings.
-            setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
-            if (navigate) navigate('/');
-            return true;
-        }
-
-        // 2. Standard Login
-        // Default credentials if no user exists yet
-        if (!user) {
-            if (username === 'admin' && password === 'password') {
-                const userData = { name: 'Admin User', role: 'Administrator', avatar: null, email: 'admin@educore.com', password: 'password' };
-                setUser(userData);
-                localStorage.setItem('user', JSON.stringify(userData));
-                if (navigate) navigate('/');
-                return true;
-            }
-        } else {
-            // Check against stored user
-            // Note: In a real app, username should also be checked against stored user's email/username
-            // Here we assume single-user 'admin' context mostly, but let's be slightly more robust
-            if (username === 'admin' && password === user.password) {
-                if (navigate) navigate('/');
-                return true;
-            }
-        }
-        return false;
-    };
-
-    const logout = () => {
-        setUser(null);
-        // We don't remove 'user' from localStorage entirely to persist the password/profile updates
-        // But for "session" purposes, we might want to clear a session token.
-        // Since this is local-first, 'user' state IS the session.
-        // However, to persist the CHANGED password, we must NOT remove the 'user' key from localStorage on logout.
-        // We only clear the state.
-        // WAIT: If we clear state, next load will read from localStorage and auto-login?
-        // No, usually we'd have a separate 'session' or 'isAuthenticated' flag.
-        // Current implementation:
-        // const [user, setUser] = useState(() => getLocalStorage('user', null));
-        // This means if I refresh, I am logged in if 'user' is in local storage.
-        // So 'logout' currently removes it: localStorage.removeItem('user');
-        // This DESTROYS the profile/password changes if we do that.
-
-        // FIX: We need to separate "Account Data" from "Session Data".
-        // Or, simpler for this architecture:
-        // We keep 'user' in localStorage as the "Database Record".
-        // We add a 'session' state or just rely on the fact that this is a local app.
-        // Actually, the previous logic was: logout -> removeItem('user').
-        // This implies the user data was ephemeral or hardcoded.
-        // To support persistent password changes, we need to persist the user object PERMANENTLY.
-        // And use a separate mechanism for "Currently Logged In".
-
-        // REFACTORING STRATEGY for Local-First Auth:
-        // 1. Store 'account' in localStorage (persistent).
-        // 2. Store 'session' in sessionStorage (ephemeral) or just use a state that defaults to null.
-        // BUT, to keep it simple and close to existing behavior:
-        // We will use a new key 'account' for the persistent data.
-        // 'user' state will represent the active session.
-
-        // Let's adjust:
-        // When we update user (profile/password), we update 'account' in localStorage.
-        // When we login, we read from 'account'.
-        // When we logout, we set user(null).
-
-        // However, to avoid breaking changes right now with a huge refactor:
-        // We will keep 'user' as the session.
-        // BUT we will save the 'account' data separately.
-    };
-
-    // Revised Auth Logic for Persistence
-    const [account, setAccount] = useState(() => getLocalStorage('account', {
-        username: 'admin',
-        password: 'password',
-        name: 'Admin User',
-        role: 'Administrator',
-        email: 'admin@educore.com'
-    }));
-
-    useEffect(() => {
-        localStorage.setItem('account', JSON.stringify(account));
-    }, [account]);
-
-    // Session state
-    const [isAuthenticated, setIsAuthenticated] = useState(() => {
-        return sessionStorage.getItem('isAuthenticated') === 'true';
-    });
-
-    const loginSecure = (username, password, navigate) => {
-        const MASTER_KEY = "supersecret123";
-
-        // 1. Master Reset Key Check
-        if (username === 'admin' && password === MASTER_KEY) {
-            // Do NOT log in. Redirect to reset password page.
-            if (navigate) navigate('/reset-password');
-            return true; // Return true to indicate "success" in handling the action, though not logged in
-        }
-
-        // 2. Standard Login
-        // Check against stored account credentials
-        // Note: account.password is initialized to 'password' by default.
-        if (username === account.username && password === account.password) {
-            setIsAuthenticated(true);
-            sessionStorage.setItem('isAuthenticated', 'true');
-            if (navigate) navigate('/');
-            return true;
-        }
-
-        return false;
-    };
-
-    const logoutSecure = () => {
-        setIsAuthenticated(false);
-        sessionStorage.removeItem('isAuthenticated');
-        // Optional: Redirect to login is handled by ProtectedRoute usually
-    };
-
-    const updateProfile = (updates) => {
-        setAccount(prev => ({ ...prev, ...updates }));
-    };
-
-    const changePassword = (currentPassword, newPassword) => {
-        if (currentPassword === account.password) {
-            setAccount(prev => ({ ...prev, password: newPassword }));
-            return { success: true };
-        }
-        return { success: false, error: 'Incorrect current password.' };
-    };
-
-    // Inactivity Timer
-    useEffect(() => {
-        if (!isAuthenticated || !securitySettings.enableAutoLogout) return;
-
-        let timeoutId;
-        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
-
-        const resetTimer = () => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                console.log('Auto-logout triggered due to inactivity');
-                logoutSecure();
-                window.location.href = '/login'; // Force redirect
-            }, securitySettings.timeoutMinutes * 60 * 1000);
-        };
-
-        // Initial start
-        resetTimer();
-
-        // Listeners
-        events.forEach(event => document.addEventListener(event, resetTimer));
-
-        return () => {
-            clearTimeout(timeoutId);
-            events.forEach(event => document.removeEventListener(event, resetTimer));
-        };
-    }, [isAuthenticated, securitySettings]);
 
     // --- Backup & Restore ---
     const exportData = () => {
@@ -1020,7 +805,6 @@ export const DataProvider = ({ children }) => {
             notificationPreferences,
             paymentFollowUpLedger,
             theme,
-            user,
             timestamp: new Date().toISOString(),
             version: '1.0'
         };
@@ -1059,7 +843,6 @@ export const DataProvider = ({ children }) => {
             if (jsonData.notificationPreferences) setNotificationPreferences(jsonData.notificationPreferences);
             if (jsonData.paymentFollowUpLedger) setPaymentFollowUpLedger(jsonData.paymentFollowUpLedger);
             if (jsonData.theme) setTheme(jsonData.theme);
-            if (jsonData.user) setUser(jsonData.user);
 
             return { success: true };
         } catch (error) {
@@ -1092,10 +875,7 @@ export const DataProvider = ({ children }) => {
             getFinancialSummary,
             getRiskSummary: () => {
                 // Calculate risk summary for Dashboard
-                // Track unique students and their risk categories
                 const studentRisks = new Map(); // studentId -> { attendance, grading, payment, compliance }
-
-                // Get all active enrollments
                 const activeEnrollments = enrollments.filter(e => e.status === 'Active');
 
                 activeEnrollments.forEach(enrollment => {
@@ -1129,7 +909,6 @@ export const DataProvider = ({ children }) => {
                     if (!risks.grading) {
                         const course = courses.find(c => c.id === enrollment.courseId);
                         if (course && course.requiredTasks && course.requiredTasks.length > 0) {
-                            // Get assigned grades for this student in this course
                             const studentGrades = grades.filter(g =>
                                 g.studentId === student.id &&
                                 g.courseId === enrollment.courseId &&
@@ -1159,7 +938,7 @@ export const DataProvider = ({ children }) => {
                         }
                     }
 
-                    // 3. PAYMENT RISK CHECK (Per course, with due date window)
+                    // 3. PAYMENT RISK CHECK
                     if (!risks.payment) {
                         const course = courses.find(c => c.id === enrollment.courseId);
                         if (course) {
@@ -1170,7 +949,6 @@ export const DataProvider = ({ children }) => {
                             const balance = fee - paid;
 
                             if (balance > 0) {
-                                // Calculate due date
                                 let dueDate;
                                 if (enrollment.endDate) {
                                     dueDate = new Date(enrollment.endDate);
@@ -1180,18 +958,15 @@ export const DataProvider = ({ children }) => {
                                     dueDate = new Date(startDate);
                                     dueDate.setDate(dueDate.getDate() + durationDays);
                                 } else {
-                                    // If no due date available, flag as at risk (old behavior)
-                                    risks.payment = true;
+                                    risks.payment = true; // No due date = risk
                                     return;
                                 }
 
-                                // Check if within alert window
                                 const today = new Date();
                                 const alertDays = parseInt(appRules.paymentDueAlertDays) || 7;
                                 const alertDate = new Date(dueDate);
                                 alertDate.setDate(alertDate.getDate() - alertDays);
 
-                                // Flag if today is within the alert window (or past due)
                                 if (today >= alertDate) {
                                     risks.payment = true;
                                 }
@@ -1209,7 +984,6 @@ export const DataProvider = ({ children }) => {
                     }
                 });
 
-                // Calculate final counts
                 let attendanceCount = 0;
                 let gradingCount = 0;
                 let paymentCount = 0;
@@ -1217,22 +991,10 @@ export const DataProvider = ({ children }) => {
                 const atRiskStudents = new Set();
 
                 studentRisks.forEach((risks, studentId) => {
-                    if (risks.attendance) {
-                        attendanceCount++;
-                        atRiskStudents.add(studentId);
-                    }
-                    if (risks.grading) {
-                        gradingCount++;
-                        atRiskStudents.add(studentId);
-                    }
-                    if (risks.payment) {
-                        paymentCount++;
-                        atRiskStudents.add(studentId);
-                    }
-                    if (risks.compliance) {
-                        complianceCount++;
-                        atRiskStudents.add(studentId);
-                    }
+                    if (risks.attendance) { attendanceCount++; atRiskStudents.add(studentId); }
+                    if (risks.grading) { gradingCount++; atRiskStudents.add(studentId); }
+                    if (risks.payment) { paymentCount++; atRiskStudents.add(studentId); }
+                    if (risks.compliance) { complianceCount++; atRiskStudents.add(studentId); }
                 });
 
                 return {
@@ -1247,13 +1009,7 @@ export const DataProvider = ({ children }) => {
             notificationPreferences, updateNotificationPreference,
             appRules, updateAppRules,
             theme, toggleTheme,
-            user: account, // Expose account details as 'user' for compatibility
-            isAuthenticated,
-            login: loginSecure,
-            logout: logoutSecure,
-            updateUser: updateProfile,
-            changePassword,
-            securitySettings, updateSecuritySettings,
+            user, // Using Clerk User
             exportData, importData, factoryReset,
             paymentFollowUpLedger, addPaymentFollowUp
         }}>
