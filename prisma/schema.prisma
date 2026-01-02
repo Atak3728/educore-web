@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Student {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  email     String?
+  phone     String?
+  photo     String?
+  status    String   @default("Active") // Active, Archived
+  createdAt DateTime @default(now())
+
+  enrollments Enrollment[]
+  notes       Note[]
+}
+
+model Course {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  type      String   // Hourly, Fixed
+  cost      Float
+  schedule  String?
+  status    String   @default("Active")
+  createdAt DateTime @default(now())
+
+  enrollments Enrollment[]
+  notes       Note[]
+}
+
+model Enrollment {
+  id             String    @id @default(uuid())
+  userId         String
+  studentId      String
+  courseId       String
+  status         String    @default("Active") // Active, Completed, Dropped
+  enrollmentDate DateTime  @default(now())
+  completionDate DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+
+  payments        Payment[]
+  paymentFollowUps PaymentFollowUp[]
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  userId       String
+  enrollmentId String
+  amount       Float
+  date         DateTime @default(now())
+  method       String?
+  status       String   @default("Paid") // Paid, Pending, Overdue
+  notes        String?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+}
+
+model PaymentFollowUp {
+  id           String   @id @default(uuid())
+  userId       String
+  enrollmentId String
+  date         DateTime
+  note         String?
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  userId    String
+  studentId String?
+  courseId  String?
+  content   String
+  type      String   @default("Note") // Task, Memo, Note
+  tags      String?
+  date      DateTime @default(now())
+
+  student Student? @relation(fields: [studentId], references: [id])
+  course  Course?  @relation(fields: [courseId], references: [id])
+}
+
+model Settings {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  schoolName String?
+  currency   String   @default("USD")
+  logo       String?
+  taxRate    Float    @default(0)
+  rules      Json?    // For storing risk thresholds etc
+}

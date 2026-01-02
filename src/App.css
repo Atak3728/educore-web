@@ -1,0 +1,222 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+/* Top Navigation Base Styles (Desktop) */
+.top-nav {
+  height: 64px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: all 0.2s;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--text-main);
+  background-color: var(--bg-hover);
+}
+
+.nav-link.active {
+  color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.hamburger-btn {
+  display: none;
+  /* Hidden on desktop */
+  background: none;
+  border: none;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .top-nav {
+    padding: 0.5rem 1rem;
+  }
+
+  .hamburger-btn {
+    display: block;
+    /* Visible on mobile */
+    margin-right: 0.5rem;
+  }
+
+  .nav-left {
+    gap: 1rem;
+    /* Reduce gap on mobile */
+  }
+
+  /* Increase specificity to override index.css */
+  .top-nav .main-nav {
+    display: none;
+    /* Hidden by default on mobile */
+    position: absolute;
+    top: 64px;
+    /* Height of top-nav */
+    left: 0;
+    right: 0;
+    background-color: var(--bg-card);
+    flex-direction: column;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    z-index: 999;
+    /* Ensure it's on top */
+  }
+
+  .top-nav .main-nav.open {
+    display: flex;
+    /* Visible when open */
+  }
+
+  .nav-link {
+    padding: 1rem;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Stack grids */
+  .dashboard-grid,
+  .stats-grid,
+  .financials-page>div,
+  .courses-page>div,
+  .student-detail-page>div {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Horizontal Scroll for Tables */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+    /* Ensure table doesn't squash */
+  }
+
+  /* Global Padding Fixes */
+  #root {
+    padding: 0;
+  }
+
+  .main-content {
+    padding: 1rem;
+    width: 90%;
+    margin: 0 auto;
+  }
+
+  /* Navigation Fixes */
+  .username {
+    display: none;
+  }
+
+  /* Grid Stack Fixes */
+  .grid-summary,
+  .grid-detailed,
+  .grid-forecasting {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Grid Layouts */
+.grid-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.grid-detailed {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.grid-forecasting {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.avatar {
+  flex-shrink: 0;
+}
+
+/* Global Visual Fixes */
+.main-content,
+.page-header,
+.card,
+.form-group {
+  text-align: left;
+}
