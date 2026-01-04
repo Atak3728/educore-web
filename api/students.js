@@ -1,9 +1,8 @@
 import { Clerk } from '@clerk/clerk-sdk-node'
-import prisma from '../lib/prisma.js'
+import prisma from './_db.js'
 
 export default async function handler(req, res) {
     const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY })
-    let userId; // Declare userId outside the try block for broader scope
 
     try {
         const authHeader = req.headers.authorization
@@ -11,41 +10,53 @@ export default async function handler(req, res) {
             return res.status(401).json({ error: 'No Authorization header' })
         }
         const token = authHeader.split(' ')[1]
-        const { sub } = await clerk.verifyToken(token)
-        userId = sub
-
-        if (!userId) {
-            return res.status(401).json({ error: 'Unauthorized' })
-        }
+        await clerk.verifyToken(token)
+        // Note: userId is no longer used in the schema, but we verify the token for security.
     } catch (error) {
         console.error('Authentication Error:', error)
         return res.status(401).json({ error: 'Authentication failed' })
     }
 
     try {
+        const prisma = (await import('./_db.js')).default;
+
         if (req.method === 'GET') {
+            const start = Date.now();
             const students = await prisma.student.findMany({
-                where: { userId },
                 orderBy: { createdAt: 'desc' },
-                include: { enrollments: true }
-            })
-            return res.status(200).json(students)
-        }
+                include: { enrollments: true, payments: true }
+            });
+            const duration = Date.now() - start;
+            res.setHeader('X-Db-Duration', duration);
+            console.log(`[API] GET /students DB_QUERY: ${duration}ms`);
 
-        if (req.method === 'POST') {
-            const { name, email, phone } = req.body
-            if (!name) return res.status(400).json({ error: 'Name is required' })
+            return res.status(200).json(students);
+        } else if (req.method === 'POST') {
+            const { name, studentPhone, fatherName, fatherPhone, motherName, motherPhone, notes, photo } = req.body;
 
-            const newStudent = await prisma.student.create({
+            // Map legacy phone to studentPhone if needed, though we updated frontend.
+            // Just ensuring we don't save 'email'.
+
+            const start = Date.now();
+            const result = await prisma.student.create({
                 data: {
-                    userId,
                     name,
-                    email,
-                    phone,
-                    status: 'Active'
+                    studentPhone: studentPhone || req.body.phone, // fallback
+                    fatherName,
+                    fatherPhone,
+                    motherName,
+                    motherPhone,
+                    notes,
+                    // photo field is not in schema? Check schema.
+                    // Schema: name, studentPhone, fatherName... no photo.
+                    // Ignoring photo for now as per schema.
                 }
-            })
-            return res.status(201).json(newStudent)
+            });
+            const duration = Date.now() - start;
+            res.setHeader('X-Db-Duration', duration);
+            console.log(`[API] POST /students DB_QUERY: ${duration}ms`);
+
+            return res.status(201).json(result);
         }
 
         return res.status(405).json({ error: 'Method not allowed' })

@@ -17,19 +17,36 @@ const Courses = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
+    // Helper: Calculate Defaults
+    const getSmartDefaults = () => {
+        const today = new Date();
+        const threeMonthsLater = new Date(today);
+        threeMonthsLater.setMonth(today.getMonth() + 3);
+
+        return {
+            name: '',
+            startDate: today.toISOString().split('T')[0],
+            endDate: threeMonthsLater.toISOString().split('T')[0],
+            fee: appRules?.defaultCourseFee || 100,
+            status: 'Active',
+            maxPoints: appRules?.defaultMaxPoints || 100
+        };
+    };
+
     const handleOpenModal = (course = null) => {
         if (course) {
             setEditingCourse(course);
             setFormData({
                 name: course.name,
-                startDate: course.startDate,
-                endDate: course.endDate,
-                fee: course.fee,
-                status: course.status
+                startDate: course.startDate ? new Date(course.startDate).toISOString().split('T')[0] : '',
+                endDate: course.endDate ? new Date(course.endDate).toISOString().split('T')[0] : '',
+                fee: course.fee || '',
+                status: course.status,
+                maxPoints: course.maxPoints || 100
             });
         } else {
             setEditingCourse(null);
-            setFormData({ name: '', startDate: '', endDate: '', fee: '', status: 'Active' });
+            setFormData(getSmartDefaults());
         }
         setIsModalOpen(true);
     };
@@ -46,6 +63,36 @@ const Courses = () => {
 
     const getStudentCount = (courseId) => {
         return enrollments.filter(e => e.courseId === courseId && e.status === 'Active').length;
+    };
+
+    // Helper: Format Date Range
+    const formatDateRange = (start, end) => {
+        if (!start) return 'Flexible Schedule';
+        const s = new Date(start).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const e = end ? new Date(end).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Ongoing';
+        return `${s} - ${e}`;
+    };
+
+    // Helper: Progress Calculation
+    const getProgressStats = (start, end) => {
+        if (!start || !end) return { percent: 0, color: 'bg-green-500' };
+
+        const startTime = new Date(start).getTime();
+        const endTime = new Date(end).getTime();
+        const now = new Date().getTime();
+        const total = endTime - startTime;
+        const elapsed = now - startTime;
+
+        if (total <= 0) return { percent: 100, color: 'bg-red-500' };
+
+        let percent = (elapsed / total) * 100;
+        percent = Math.min(100, Math.max(0, percent));
+
+        let color = 'bg-green-500'; // < 50%
+        if (percent >= 50 && percent < 80) color = 'bg-yellow-500';
+        if (percent >= 80) color = 'bg-red-500';
+
+        return { percent, color };
     };
 
     // Filter, Sort, and Paginate
@@ -94,58 +141,56 @@ const Courses = () => {
                         <p>No courses found.</p>
                     </div>
                 ) : (
-                    paginatedCourses.map(course => (
-                        <div key={course.id} className="card" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{course.name}</h3>
-                                <StatusTag status={course.status} type="enrollment" />
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <Calendar size={14} />
-                                    <span>{course.startDate}</span>
+                    paginatedCourses.map(course => {
+                        const { percent, color } = getProgressStats(course.startDate, course.endDate);
+                        return (
+                            <div key={course.id} className="card" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{course.name}</h3>
+                                    <StatusTag status={course.status} type="enrollment" />
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <Users size={14} />
-                                    <span>{getStudentCount(course.id)} Students</span>
+
+                                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <Calendar size={14} />
+                                        <span>{formatDateRange(course.startDate, course.endDate)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <Users size={14} />
+                                        <span>{getStudentCount(course.id)} Students</span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* Progress Bar */}
-                            <div style={{ marginBottom: '1rem' }}>
-                                {(() => {
-                                    const progress = calculateCourseProgress(course.startDate, appRules.courseDuration);
-                                    let color = 'var(--primary)';
-                                    if (progress >= 90) color = 'var(--danger)';
-                                    else if (progress >= 75) color = 'var(--warning)';
-
-                                    return (
-                                        <div style={{ width: '100%', height: '6px', backgroundColor: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                                            <div style={{
-                                                width: `${progress}%`,
-                                                height: '100%',
-                                                backgroundColor: color,
-                                                transition: 'width 0.5s ease-in-out'
-                                            }} title={`${progress.toFixed(0)}% Complete`} />
+                                {/* Progress Bar */}
+                                {course.startDate && course.endDate && (
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                                            <span>Progress</span>
+                                            <span>{Math.round(percent)}%</span>
                                         </div>
-                                    );
-                                })()}
-                            </div>
+                                        <div style={{ width: '100%', height: '0.5rem', backgroundColor: 'var(--border)', borderRadius: '9999px', overflow: 'hidden' }}>
+                                            <div style={{ width: `${percent}%`, height: '100%', transition: 'width 0.5s ease-in-out' }} className={color}></div>
+                                        </div>
+                                    </div>
+                                )}
 
-                            <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
-                                <span style={{ fontWeight: 'bold' }}>${parseFloat(course.fee).toFixed(2)}</span>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button className="btn" onClick={() => handleOpenModal(course)} style={{ padding: '0.25rem 0.5rem', color: 'var(--text-muted)' }}>
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <Link to={`/courses/${course.id}`} className="btn btn-primary" style={{ textDecoration: 'none', fontSize: '0.9rem' }}>
-                                        Manage Course
-                                    </Link>
+                                <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.9rem' }}>Total Fee</span>
+                                        <span style={{ fontWeight: 'bold' }}>${parseFloat(course.fee || 0).toFixed(2)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <button className="btn" onClick={() => handleOpenModal(course)} style={{ padding: '0.25rem 0.5rem', color: 'var(--text-muted)' }}>
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <Link to={`/courses/${course.id}`} className="btn btn-primary" style={{ textDecoration: 'none', fontSize: '0.9rem' }}>
+                                            Manage Course
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
 
@@ -159,8 +204,9 @@ const Courses = () => {
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
                         <label style={{ display: 'block', marginBottom: '0.5rem' }}>Course Name</label>
-                        <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                        <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Advanced Mathematics" />
                     </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Start Date</label>
@@ -171,19 +217,22 @@ const Courses = () => {
                             <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
                         </div>
                     </div>
+
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Total Fee ($)</label>
-                            <input type="number" required value={formData.fee} onChange={e => setFormData({ ...formData, fee: e.target.value })} />
+                            <input type="number" required value={formData.fee} onChange={e => setFormData({ ...formData, fee: e.target.value })} placeholder="100.00" />
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Status</label>
                             <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                                 <option value="Active">Active</option>
                                 <option value="Completed">Completed</option>
+                                <option value="Archived">Archived</option>
                             </select>
                         </div>
                     </div>
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
                         <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
                         <button type="submit" className="btn btn-primary">Save Course</button>

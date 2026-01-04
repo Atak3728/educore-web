@@ -15,18 +15,7 @@ const Students = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const itemsPerPage = 20;
-
-    const [newStudent, setNewStudent] = useState({
-        name: '',
-        studentPhone: '',
-        fatherName: '',
-        fatherPhone: '',
-        motherName: '',
-        motherPhone: '',
-        notes: ''
-    });
 
     // Helper to get student details
     const getStudentDetails = (studentId) => {
@@ -64,7 +53,8 @@ const Students = () => {
     const filteredStudents = students
         .filter(s =>
             s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (s.studentPhone && s.studentPhone.includes(searchTerm))
+            (s.studentPhone && s.studentPhone.includes(searchTerm)) ||
+            (s.fatherName && s.fatherName.toLowerCase().includes(searchTerm.toLowerCase()))
         )
         .sort((a, b) => {
             // Assuming ID is a string, we can try to sort by it descending if it's time-based or numeric-ish.
@@ -82,24 +72,7 @@ const Students = () => {
         currentPage * itemsPerPage
     );
 
-    const handleAddStudent = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        // Simulate small delay for UX
-        await new Promise(resolve => setTimeout(resolve, 600));
-        addStudent(newStudent);
-        setIsSubmitting(false);
-        setIsModalOpen(false);
-        setNewStudent({
-            name: '',
-            studentPhone: '',
-            fatherName: '',
-            fatherPhone: '',
-            motherName: '',
-            motherPhone: '',
-            notes: ''
-        });
-    };
+
 
     return (
         <div className="students-page">
@@ -133,8 +106,8 @@ const Students = () => {
                                 <th>Current Course</th>
                                 <th>Payment Status</th>
                                 <th>Attendance</th>
-                                <th>Father's Phone</th>
-                                <th>Mother's Phone</th>
+                                <th>Parent / Guardian</th>
+                                <th>Student Phone</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -161,8 +134,15 @@ const Students = () => {
                                                 <StatusTag status={details.paymentStatus} type="payment" />
                                             </td>
                                             <td>{details.attendanceRate}</td>
-                                            <td>{student.fatherPhone || '-'}</td>
-                                            <td>{student.motherPhone || '-'}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.9rem' }}>
+                                                    <span>{student.fatherName || student.motherName || '-'}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                        {student.fatherPhone || student.motherPhone || '-'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td>{student.studentPhone || '-'}</td>
                                             <td>
                                                 <Link to={`/students/${student.id}`} className="btn" style={{ color: 'var(--primary)', padding: '0.25rem' }}>
                                                     View
@@ -184,57 +164,10 @@ const Students = () => {
             </div>
 
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Student">
-                <form onSubmit={handleAddStudent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Full Name</label>
-                        <input required value={newStudent.name} onChange={e => setNewStudent({ ...newStudent, name: e.target.value })} />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem' }}>Student Phone</label>
-                            <input value={newStudent.studentPhone} onChange={e => setNewStudent({ ...newStudent, studentPhone: e.target.value })} />
-                        </div>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Father's Info</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Name</label>
-                                <input value={newStudent.fatherName} onChange={e => setNewStudent({ ...newStudent, fatherName: e.target.value })} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone</label>
-                                <input value={newStudent.fatherPhone} onChange={e => setNewStudent({ ...newStudent, fatherPhone: e.target.value })} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem' }}>
-                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Mother's Info</h4>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Name</label>
-                                <input value={newStudent.motherName} onChange={e => setNewStudent({ ...newStudent, motherName: e.target.value })} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Phone</label>
-                                <input value={newStudent.motherPhone} onChange={e => setNewStudent({ ...newStudent, motherPhone: e.target.value })} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '0.5rem' }}>Notes</label>
-                        <textarea value={newStudent.notes} onChange={e => setNewStudent({ ...newStudent, notes: e.target.value })} rows="2" />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
-                        <button type="button" className="btn" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</button>
-                        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? 'Adding...' : 'Add Student'}
-                        </button>
-                    </div>
-                </form>
+                <AddStudentForm
+                    onSuccess={() => setIsModalOpen(false)}
+                    onCancel={() => setIsModalOpen(false)}
+                />
             </Modal>
         </div>
     );

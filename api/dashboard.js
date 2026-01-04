@@ -1,5 +1,5 @@
 import { Clerk } from '@clerk/clerk-sdk-node'
-import prisma from '../lib/prisma.js'
+import prisma from './_db.js'
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -20,23 +20,21 @@ export default async function handler(req, res) {
         }
 
         // Parallel fetch for dashboard stats
+        // Note: Removing userId filters as new schema is currently single-tenant or shared
         const [
             studentsCount,
             activeCourses,
             recentPayments,
-            monthlyTarget
+            appSettings
         ] = await Promise.all([
-            prisma.student.count({ where: { userId, status: 'Active' } }),
-            prisma.course.count({ where: { userId, status: 'Active' } }),
+            prisma.student.count(), // Count all students
+            prisma.course.count({ where: { status: 'Active' } }),
             prisma.payment.findMany({
-                where: { userId },
                 orderBy: { date: 'desc' },
-                take: 5
+                take: 5,
+                include: { student: true, course: true } // Include details for display
             }),
-            prisma.settings.findUnique({
-                where: { userId },
-                select: { currency: true } // Example settings fetch
-            })
+            prisma.appSetting.findFirst()
         ])
 
         return res.status(200).json({
@@ -45,7 +43,7 @@ export default async function handler(req, res) {
                 activeCourses: activeCourses,
             },
             recentPayments,
-            currency: monthlyTarget?.currency || 'USD'
+            currency: 'USD' // appSettings?.currency // Schema doesn't have currency yet, defaulting
         })
 
     } catch (error) {

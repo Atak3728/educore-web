@@ -8,92 +8,126 @@ datasource db {
 }
 
 model Student {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  email     String?
-  phone     String?
-  photo     String?
-  status    String   @default("Active") // Active, Archived
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  name          String
+  studentPhone  String?
+  fatherName    String?
+  fatherPhone   String?
+  motherName    String?
+  motherPhone   String?
+  notes         String?  // Profile notes
 
-  enrollments Enrollment[]
-  notes       Note[]
+  // Relations
+  enrollments       Enrollment[]
+  attendance        Attendance[]
+  grades            Grade[]
+  complianceRecords ComplianceRecord[]
+  payments          Payment[]
 }
 
 model Course {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  type      String   // Hourly, Fixed
-  cost      Float
-  schedule  String?
-  status    String   @default("Active")
-  createdAt DateTime @default(now())
+  id            String    @id @default(uuid())
+  createdAt     DateTime  @default(now())
+  name          String
+  description   String?
+  status        String    // 'Active'/'Completed'
+  startDate     DateTime
+  endDate       DateTime?
+  fee           Float
+  maxPoints     Int       @default(100)
+  requiredTasks Json      // Store the task array here
 
+  // Relations
   enrollments Enrollment[]
-  notes       Note[]
+  attendance  Attendance[]
+  grades      Grade[]
+  payments    Payment[]
 }
 
 model Enrollment {
-  id             String    @id @default(uuid())
-  userId         String
-  studentId      String
-  courseId       String
-  status         String    @default("Active") // Active, Completed, Dropped
-  enrollmentDate DateTime  @default(now())
-  completionDate DateTime?
+  id                    String    @id @default(uuid())
+  createdAt             DateTime  @default(now())
+  studentId             String
+  courseId              String
+  status                String
+  startDate             DateTime
+  endDate               DateTime?
+  completedDate         DateTime?
+  paymentFollowUpLedger Json      // Store payment conversation history here
 
+  // Relations
   student Student @relation(fields: [studentId], references: [id])
   course  Course  @relation(fields: [courseId], references: [id])
-
-  payments        Payment[]
-  paymentFollowUps PaymentFollowUp[]
 }
 
 model Payment {
-  id           String   @id @default(uuid())
-  userId       String
-  enrollmentId String
-  amount       Float
-  date         DateTime @default(now())
-  method       String?
-  status       String   @default("Paid") // Paid, Pending, Overdue
-  notes        String?
-
-  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
-}
-
-model PaymentFollowUp {
-  id           String   @id @default(uuid())
-  userId       String
-  enrollmentId String
-  date         DateTime
-  note         String?
-
-  enrollment Enrollment @relation(fields: [enrollmentId], references: [id])
-}
-
-model Note {
   id        String   @id @default(uuid())
-  userId    String
-  studentId String?
-  courseId  String?
-  content   String
-  type      String   @default("Note") // Task, Memo, Note
-  tags      String?
-  date      DateTime @default(now())
+  date      DateTime
+  amount    Float
+  method    String
+  note      String?
+  studentId String
+  courseId  String
 
-  student Student? @relation(fields: [studentId], references: [id])
-  course  Course?  @relation(fields: [courseId], references: [id])
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
 }
 
-model Settings {
-  id         String   @id @default(uuid())
-  userId     String   @unique
-  schoolName String?
-  currency   String   @default("USD")
-  logo       String?
-  taxRate    Float    @default(0)
-  rules      Json?    // For storing risk thresholds etc
+model Advance {
+  id     String   @id @default(uuid())
+  date   DateTime
+  amount Float
+  note   String?
+}
+
+model Attendance {
+  id          String   @id @default(uuid())
+  date        DateTime
+  sessionId   String   // for grouping
+  studentId   String
+  courseId    String
+  status      String
+  sessionNote String?
+  note        String?
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+}
+
+model Grade {
+  id             String   @id @default(uuid())
+  date           DateTime
+  studentId      String
+  courseId       String
+  taskId         String   // matches ID inside Course.requiredTasks
+  score          Float
+  feedback       String?
+  submissionLink String?
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+}
+
+model ComplianceRecord {
+  id            String   @id @default(uuid())
+  date          DateTime
+  studentId     String
+  violationType String
+  status        String
+  note          String?
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+}
+
+model AppSetting {
+  id                    String @id @default(uuid())
+  teacherShare          Float
+  courseDuration        Int
+  complianceStrikeLimit Int    @default(3)
+  jsonRules             Json   // Store other loose settings here
 }

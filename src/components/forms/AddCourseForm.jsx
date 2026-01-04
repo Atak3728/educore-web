@@ -1,9 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 
 const AddCourseForm = ({ onSuccess, onCancel }) => {
-    const { addCourse } = useData();
-    const [formData, setFormData] = useState({ name: '', startDate: '', endDate: '', fee: '', status: 'Active' });
+    const { addCourse, appRules } = useData();
+
+    // Smart Defaults Logic
+    const getSmartDefaults = () => {
+        const today = new Date();
+        const threeMonthsLater = new Date(today);
+        threeMonthsLater.setMonth(today.getMonth() + 3);
+
+        return {
+            name: '',
+            startDate: today.toISOString().split('T')[0],
+            endDate: threeMonthsLater.toISOString().split('T')[0],
+            fee: appRules?.defaultCourseFee || 100,
+            status: 'Active',
+            maxPoints: appRules?.defaultMaxPoints || 100
+        };
+    };
+
+    const [formData, setFormData] = useState(getSmartDefaults());
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -15,31 +32,55 @@ const AddCourseForm = ({ onSuccess, onCancel }) => {
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem' }}>Course Name</label>
-                <input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                <input
+                    required
+                    value={formData.name}
+                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Advanced Mathematics"
+                />
             </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem' }}>Start Date</label>
-                    <input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
+                    <input
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    />
                 </div>
                 <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem' }}>End Date</label>
-                    <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
+                    <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    />
                 </div>
             </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem' }}>Total Fee ($)</label>
-                    <input type="number" required value={formData.fee} onChange={e => setFormData({ ...formData, fee: e.target.value })} />
+                    <input
+                        type="number"
+                        required
+                        value={formData.fee}
+                        onChange={e => setFormData({ ...formData, fee: e.target.value })}
+                        placeholder="100.00"
+                    />
                 </div>
                 <div>
                     <label style={{ display: 'block', marginBottom: '0.5rem' }}>Status</label>
                     <select value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                         <option value="Active">Active</option>
                         <option value="Completed">Completed</option>
+                        <option value="Archived">Archived</option>
                     </select>
                 </div>
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" className="btn" onClick={onCancel}>Cancel</button>
                 <button type="submit" className="btn btn-primary">Save Course</button>
